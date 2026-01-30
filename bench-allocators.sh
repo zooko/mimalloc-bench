@@ -5,14 +5,19 @@ BNAME="mimalloc-bench"
 
 # Collect metadata
 GITCOMMIT=$(git rev-parse HEAD)
-GITCLEANSTATUS=$( [ -z "$( git status --porcelain )" ] && echo \"Clean\" || echo \"Uncommitted changes\" )
+GITCLEANSTATUS=$([ -z "$(git status --porcelain)" ] && echo "Clean" || echo "Uncommitted changes")
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-# CPU type on linuxy
-CPUTYPE=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d':' -f2-)
-if [ -z "${CPUTYPE}" ] ; then
-    # CPU type on macos
-    CPUTYPE=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Unknown")
+# Detect CPU type
+if command -v lscpu >/dev/null 2>&1; then
+    # Linux, but John's little raspbi has better information in lscpu than in /proc/cpuinfo
+    CPUTYPE=$(lscpu 2>/dev/null | grep -i "model name" | cut -d':' -f2-)
+elif command -v sysctl >/dev/null 2>&1; then
+    # macOS
+    CPUTYPE=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
+elif [ -f /proc/cpuinfo ]; then
+    # Linux in case it didn't have lscpu, and also mingw64 on Windows provides /proc/cpuifo
+    CPUTYPE=$(grep -m1 "model name" /proc/cpuinfo | cut -d':' -f2-)
 fi
 CPUTYPE=${CPUTYPE:-Unknown}
 CPUTYPE=${CPUTYPE## }  # Trim leading space
@@ -23,9 +28,6 @@ OSTYPESTR="${OSTYPE//[^[:alnum:]]/}"
 CPUCOUNT=$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo "${NUMBER_OF_PROCESSORS:-unknown}")
 
 ARGS=$*
-
-CPUSTR_DOT_OSSTR="${CPUTYPESTR}.${OSTYPESTR}"
-OUTPUT_DIR="${OUTPUT_DIR:-./bench/results}/${CPUSTR_DOT_OSSTR}"
 
 RESF="${OUTPUT_DIR}/${BNAME}.result.txt"
 GRAPH_BASE="${OUTPUT_DIR}/${BNAME}.graph-"
